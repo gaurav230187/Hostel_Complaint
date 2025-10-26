@@ -1,3 +1,4 @@
+# Hostel_Complaint
 Hostel COmplaint System 
 
 A full-stack MERN (MongoDB, Express, React, Node.js) application designed to digitize and manage the grievance redressal process in a college hostel. This system provides separate interfaces for students and wardens to handle complaints efficiently.
