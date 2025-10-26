@@ -1,105 +1,46 @@
-const express = require("express");
-const cors = require("cors");
-const app = express();
-const db = require("../db");
-const { jwtGenerator, jwtDecoder } = require("../utils/jwtToken");
-
-app.use(cors());
-app.use(express.json());
-
-const decodeUser = async (token) => {
-  try {
-    const decodedToken = jwtDecoder(token);
-    console.log(decodedToken);
-
-    const { user_id, type } = decodedToken.user;
-    let userInfo;
-
-    if (type === "student") {
-      const query = `
-        SELECT student_id, room, block_id
-        FROM student 
-        WHERE student_id = $1
-      `;
-
-      const result = await db.pool.query(query, [user_id]);
-      console.log(result.rows);
-      if (result.rows.length > 0) {
-        userInfo = result.rows[0];
-      }
-    }
-
-    if (type === "warden") {
-      const query = `
-        SELECT warden_id,  block_id
-        FROM warden 
-        WHERE warden_id = $1
-      `;
-
-      const result = await db.pool.query(query, [user_id]);
-
-      if (result.rows.length > 0) {
-        userInfo = result.rows[0];
-      }
-    }
-
-    return userInfo;
-  } catch (err) {
-    console.error("here111", err.message);
-  }
-};
+const Complaint = require('../models/Complaint');
+// We no longer need the 'decodeUser' function, middleware handles it
 
 exports.postComplaints = async (req, res) => {
   try {
-    const token = req.headers.authorization;
-    console.log(token);
-    const userInfo = await decodeUser(token);
+    // req.user is provided by the 'auth' middleware
+    const { _id, block_id } = req.user; 
+    const { name, description, room } = req.body;
 
-    const { student_id, block_id } = userInfo;
-
-    const { name, description, room, is_completed, assigned_at } = req.body;
-
-    const query = `insert into complaint 
-            (name, block_id, 
-            student_id, 
-            description, room, is_completed, created_at,
-            assigned_at) 
-            values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`;
-
-    const newComplaint = await db.pool.query(query, [
+    const newComplaint = new Complaint({
       name,
-      block_id,
-      student_id,
       description,
       room,
-      false,
-      new Date().toISOString(),
-      null,
-    ]);
-    res.json(newComplaint.rows[0]);
+      user_id: _id,         // User's Mongoose _id
+      block_id: block_id._id, // The _id of the user's populated block
+    });
+
+    await newComplaint.save();
+    res.json(newComplaint);
+
   } catch (err) {
     console.log(err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
 exports.putComplaintsByid = async (req, res) => {
-  const token = req.headers.authorization;
-  const decodedToken = jwtDecoder(token);
-  console.log(decodedToken);
-  const { user_id, type } = decodedToken.user;
-
+  // This controller is protected by 'auth' and 'authorizeWarden'
   try {
     const { id } = req.params;
 
-    if (type === "warden") {
-      const result = await db.pool.query(
-        "UPDATE complaint SET is_completed = NOT is_completed, assigned_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
-        [id]
-      );
-      res.json(result.rows[0]);
-    } else {
-      res.status(404).json({ error: "Complaint not found" });
+    const updatedComplaint = await Complaint.findByIdAndUpdate(
+      id,
+      { is_completed: true, assigned_at: Date.now() },
+      { new: true } // This option returns the updated document
+    );
+
+    if (!updatedComplaint) {
+      return res.status(404).json({ error: "Complaint not found" });
     }
+    
+    res.json(updatedComplaint);
+
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ error: "Internal Server Error" });
@@ -107,28 +48,23 @@ exports.putComplaintsByid = async (req, res) => {
 };
 
 exports.getAllComplaintsByUser = async (req, res) => {
-  const token = req.headers.authorization;
-  console.log(token);
-  const decodedToken = jwtDecoder(token);
-  console.log(decodedToken);
-
-  const { user_id, type } = decodedToken.user;
+  // 'auth' middleware provides req.user
+  const { _id, type, block_id } = req.user;
 
   try {
+    let complaints;
     if (type === "warden") {
-      const allComplaints = await db.pool.query(
-        "SELECT * FROM complaint ORDER BY created_at DESC"
-      );
-      res.json(allComplaints.rows);
+      // Find all complaints for the warden's block_id
+      complaints = await Complaint.find({ block_id: block_id._id })
+        .populate('user_id', 'full_name usn room') // Show who made the complaint
+        .sort({ created_at: -1 });
     } else if (type === "student") {
-      const myComplaints = await db.pool.query(
-        "SELECT * FROM complaint WHERE student_id = $1 ORDER BY created_at DESC",
-        [user_id]
-      );
-      res.json(myComplaints.rows);
-    } else {
-      res.status(403).json({ error: "Unauthorized" });
+      // Find only this student's complaints
+      complaints = await Complaint.find({ user_id: _id })
+        .sort({ created_at: -1 });
     }
+
+    res.json(complaints);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Internal Server Error" });
@@ -136,14 +72,9 @@ exports.getAllComplaintsByUser = async (req, res) => {
 };
 
 exports.getUserType = async (req, res) => {
+  // 'auth' middleware provides req.user
   try {
-    const token = req.headers.authorization;
-    console.log(token);
-    const decodedToken = jwtDecoder(token);
-    console.log(decodedToken);
-    const { type } = decodedToken.user;
-
-    res.json({ userType: type });
+    res.json({ userType: req.user.type });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Internal Server Error" });
@@ -151,36 +82,25 @@ exports.getUserType = async (req, res) => {
 };
 
 exports.getUserDetails = async (req, res) => {
+  // 'auth' middleware already fetched the user and populated the block
   try {
-    const token = req.headers.authorization;
-    console.log(token);
-    const decodedToken = jwtDecoder(token);
-    console.log(decodedToken);
-    const { user_id, type } = decodedToken.user;
-
-    console.log("Decoded Token:", decodedToken);
-
-    console.log("User Type:", type);
-
-    console.log("User ID:", user_id);
-
-    if (type == "student") {
-      const studentDetails = await db.pool.query(
-        `SELECT u.full_name, u.email, u.phone, s.usn, b.block_id, b.block_name, s.room
-      FROM users u, student s, block b
-      WHERE u.user_id = $1 AND u.user_id = s.student_id AND s.block_id = b.block_id`,
-        [user_id]
-      );
-      res.json(studentDetails.rows);
-    }
-    if (type == "warden") {
-      const wardenDetails = await db.pool.query(
-        `select u.full_name,u.email,u.phone
-                                                  from users u 
-                                                  where user_id=$1 `,
-        [user_id]
-      );
-      res.json(wardenDetails.rows);
+    // Format the req.user data to match what the frontend expects
+    if (req.user.type === "student") {
+        res.json([{
+            full_name: req.user.full_name,
+            email: req.user.email,
+            phone: req.user.phone,
+            usn: req.user.usn,
+            block_id: req.user.block_id.block_name, // Send the name, not the _id
+            block_name: req.user.block_id.block_name,
+            room: req.user.room
+        }]);
+    } else if (req.user.type === "warden") {
+        res.json([{
+            full_name: req.user.full_name,
+            email: req.user.email,
+            phone: req.user.phone
+        }]);
     }
   } catch (err) {
     console.error(err.message);
@@ -189,21 +109,17 @@ exports.getUserDetails = async (req, res) => {
 };
 
 exports.deleteComplaints = async (req, res) => {
+  // This controller is protected by 'auth' and 'authorizeWarden'
   try {
-    const token = req.headers.authorization;
-    console.log(token);
-    const decodedToken = jwtDecoder(token);
-    console.log(decodedToken);
-    const { type } = decodedToken.user;
     const { id } = req.params;
 
-    if (type == "warden") {
-      const deleteComplaint = await db.pool.query(
-        `delete from complaint where id = $1`,
-        [id]
-      );
-      res.json("complaint deleted");
+    const deletedComplaint = await Complaint.findByIdAndDelete(id);
+
+    if (!deletedComplaint) {
+      return res.status(404).json({ error: "Complaint not found" });
     }
+
+    res.json("complaint deleted");
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ error: "Internal Server Error" });

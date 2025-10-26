@@ -8,15 +8,18 @@ const {
   getUserDetails,
   deleteComplaints
 } = require("../controller/complaintController");
-const { authorizeWarden } = require("../middleware/auth");
 
-complaintRoutes.post("/complaints", postComplaints);
-complaintRoutes.get("/complaints", authorizeWarden, getAllComplaintsByUser);
-// complaintRoutes.get("/complaints", getAllComplaintsByUser);
-complaintRoutes.post("/complaints/:id", putComplaintsByid);
-complaintRoutes.delete("/complaints/:id", deleteComplaints);
+// Import your new middleware
+const { auth, authorizeWarden } = require("../middleware/auth");
 
-complaintRoutes.get("/userType", getUserType);
-complaintRoutes.get("/userDetails/:id", getUserDetails);
+// Apply the middleware to protect your routes
+complaintRoutes.post("/complaints", auth, postComplaints);
+complaintRoutes.get("/complaints", auth, getAllComplaintsByUser);
+complaintRoutes.post("/complaints/:id", auth, authorizeWarden, putComplaintsByid);
+complaintRoutes.delete("/complaints/:id", auth, authorizeWarden, deleteComplaints);
+
+complaintRoutes.get("/userType", auth, getUserType);
+// This route no longer needs an :id, it gets the user from the token
+complaintRoutes.get("/userDetails", auth, getUserDetails);
 
 module.exports = complaintRoutes;

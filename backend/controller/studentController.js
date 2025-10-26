@@ -1,19 +1,22 @@
-const express = require("express");
-const cors = require("cors");
-const app = express();
-const db = require("../db");
-app.use(cors());
-app.use(express.json());
+const User = require('../models/User');
 
 exports.getStudentByid = async(req, res)=> {
     try {
         const {student_id} = req.params;
-        const student = await db.pool.query(
-          "select * from student where student_id = $1",
-          [student_id]
-        );
-        res.json(student.rows)
+        // Find a user who is a 'student' and matches the _id
+        const student = await User.findOne({
+            _id: student_id,
+            type: 'student'
+        })
+        .populate('block_id', 'block_name') // Also get their block name
+        .select('-password'); // Don't send password
+
+        if (!student) {
+            return res.status(404).json({ msg: "Student not found" });
+        }
+        res.json(student)
       } catch (err) {
         console.log(err.message);
+        res.status(500).json({ error: "Internal Server Error" });
       }
 };

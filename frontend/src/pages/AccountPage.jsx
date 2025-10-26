@@ -37,15 +37,15 @@ function AccountPage() {
     fetchUserType();
   }, []);
 
-  const getuserDetails = async (user_id) => {
-    try {
-      const response = await fetch(
-        `http://localhost:3000/userDetails/${user_id}`,
-        {
-          method: "GET",
-          headers: headers,
-        }
-      );
+  const getuserDetails = async () => {
+  try {
+    const response = await fetch(
+      `http://localhost:3000/userDetails`, // The ID is no longer needed in the URL
+      {
+        method: "GET",
+        headers: headers,
+      }
+    );
       const data = await response.json();
       console.log(data);
       setUserName(data[0].full_name);
