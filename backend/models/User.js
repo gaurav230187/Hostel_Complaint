@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['student', 'warden'],
+    enum: ['student', 'warden', 'worker'], // Added 'worker'
     required: true,
   },
   block_id: {
@@ -34,6 +34,10 @@ const UserSchema = new mongoose.Schema({
   },
   room: {
     type: String,
+  },
+  // Worker-specific field
+  specialization: {
+    type: String, // e.g., 'Electric', 'Water', 'Carpentry'
   },
 });
 

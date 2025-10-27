@@ -1,18 +1,19 @@
 const Complaint = require('../models/Complaint');
-// We no longer need the 'decodeUser' function, middleware handles it
+const User = require('../models/User'); // We need User model for worker check
 
 exports.postComplaints = async (req, res) => {
   try {
-    // req.user is provided by the 'auth' middleware
     const { _id, block_id } = req.user; 
-    const { name, description, room } = req.body;
+    const { name, description, room, category } = req.body; 
 
     const newComplaint = new Complaint({
       name,
       description,
       room,
-      user_id: _id,         // User's Mongoose _id
-      block_id: block_id._id, // The _id of the user's populated block
+      category, 
+      user_id: _id,
+      block_id: block_id._id,
+      // status defaults to 'Pending'
     });
 
     await newComplaint.save();
@@ -24,15 +25,16 @@ exports.postComplaints = async (req, res) => {
   }
 };
 
+// This is now "Verify as Complete" (Warden only)
 exports.putComplaintsByid = async (req, res) => {
-  // This controller is protected by 'auth' and 'authorizeWarden'
   try {
     const { id } = req.params;
 
     const updatedComplaint = await Complaint.findByIdAndUpdate(
       id,
-      { is_completed: true, assigned_at: Date.now() },
-      { new: true } // This option returns the updated document
+      // Set status to Verified and add the verification date
+      { status: 'Verified', verified_at: Date.now() },
+      { new: true }
     );
 
     if (!updatedComplaint) {
@@ -47,20 +49,90 @@ exports.putComplaintsByid = async (req, res) => {
   }
 };
 
+// Assign a worker to a complaint (Warden only)
+exports.assignWorkerToComplaint = async (req, res) => {
+  try {
+    const { id } = req.params; // Complaint ID
+    const { worker_id } = req.body; // Worker's User ID
+
+    if (!worker_id) {
+      return res.status(400).json({ error: "Worker ID is required" });
+    }
+
+    const updatedComplaint = await Complaint.findByIdAndUpdate(
+      id,
+      // Set status to Assigned and add worker/date
+      { 
+        assigned_to: worker_id, 
+        assigned_at: Date.now(),
+        status: 'Assigned' 
+      },
+      { new: true }
+    )
+    .populate('assigned_to', 'full_name phone specialization');
+
+    if (!updatedComplaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+    
+    res.json(updatedComplaint);
+
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// --- NEW FUNCTION ---
+// Mark work as complete (Worker only)
+exports.workerMarkComplete = async (req, res) => {
+  try {
+    const { id } = req.params; // Complaint ID
+    const { _id } = req.user; // Worker's ID from token
+
+    // Find the complaint
+    const complaint = await Complaint.findById(id);
+    if (!complaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    // Security check: Is this worker assigned to this complaint?
+    if (complaint.assigned_to.toString() !== _id.toString()) {
+      return res.status(403).json({ error: "You are not assigned to this complaint." });
+    }
+
+    // Update the complaint
+    complaint.status = 'Work_Completed';
+    complaint.worker_completed_at = Date.now();
+    await complaint.save();
+    
+    res.json(complaint);
+
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+// --- END NEW FUNCTION ---
+
 exports.getAllComplaintsByUser = async (req, res) => {
-  // 'auth' middleware provides req.user
   const { _id, type, block_id } = req.user;
 
   try {
     let complaints;
     if (type === "warden") {
-      // Find all complaints for the warden's block_id
       complaints = await Complaint.find({ block_id: block_id._id })
-        .populate('user_id', 'full_name usn room') // Show who made the complaint
+        .populate('user_id', 'full_name usn room')
+        .populate('assigned_to', 'full_name phone specialization') 
         .sort({ created_at: -1 });
     } else if (type === "student") {
-      // Find only this student's complaints
       complaints = await Complaint.find({ user_id: _id })
+        .populate('assigned_to', 'full_name phone specialization') 
+        .sort({ created_at: -1 });
+    } else if (type === "worker") { 
+      complaints = await Complaint.find({ assigned_to: _id })
+        .populate('user_id', 'full_name usn room')
+        .populate('block_id', 'block_name')
         .sort({ created_at: -1 });
     }
 
@@ -71,8 +143,8 @@ exports.getAllComplaintsByUser = async (req, res) => {
   }
 };
 
+// ... (getUserType, getUserDetails, deleteComplaints remain unchanged)
 exports.getUserType = async (req, res) => {
-  // 'auth' middleware provides req.user
   try {
     res.json({ userType: req.user.type });
   } catch (err) {
@@ -80,18 +152,15 @@ exports.getUserType = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 exports.getUserDetails = async (req, res) => {
-  // 'auth' middleware already fetched the user and populated the block
   try {
-    // Format the req.user data to match what the frontend expects
     if (req.user.type === "student") {
         res.json([{
             full_name: req.user.full_name,
             email: req.user.email,
             phone: req.user.phone,
             usn: req.user.usn,
-            block_id: req.user.block_id.block_name, // Send the name, not the _id
+            block_id: req.user.block_id.block_name,
             block_name: req.user.block_id.block_name,
             room: req.user.room
         }]);
@@ -101,24 +170,26 @@ exports.getUserDetails = async (req, res) => {
             email: req.user.email,
             phone: req.user.phone
         }]);
+    } else if (req.user.type === "worker") { 
+        res.json([{
+            full_name: req.user.full_name,
+            email: req.user.email,
+            phone: req.user.phone,
+            specialization: req.user.specialization
+        }]);
     }
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 exports.deleteComplaints = async (req, res) => {
-  // This controller is protected by 'auth' and 'authorizeWarden'
   try {
     const { id } = req.params;
-
     const deletedComplaint = await Complaint.findByIdAndDelete(id);
-
     if (!deletedComplaint) {
       return res.status(404).json({ error: "Complaint not found" });
     }
-
     res.json("complaint deleted");
   } catch (err) {
     console.log(err.message);

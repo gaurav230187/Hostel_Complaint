@@ -3,7 +3,7 @@ import { Roles } from "../constants";
 import { useState } from "react";
 
 function Register() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const [fullname, setFullname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +12,8 @@ function Register() {
   const [block_id, setBlock_id] = useState("");
   const [usn, setUsn] = useState("");
   const [room, setRoom] = useState("");
+  // Set default specialization to match the first option
+  const [specialization, setSpecialization] = useState("Electric");
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +27,17 @@ function Register() {
           phone,
           type: role,
           block_id,
+        };
+      } else if (role === Roles.WORKER) {
+        // Added worker case
+        body = {
+          full_name: fullname,
+          email,
+          password,
+          phone,
+          type: role,
+          block_id,
+          specialization, // This state now comes from the dropdown
         };
       } else {
         body = {
@@ -48,7 +61,7 @@ function Register() {
       console.log(data);
       if (data.jwtToken) {
         alert("User registered successfully,login to proceed");
-        navigate('/login')
+        navigate("/login");
       } else {
         alert("user already exists");
       }
@@ -61,6 +74,7 @@ function Register() {
     <>
       <div className="flex min-h-screen w-screen items-center justify-center text-gray-600 bg-gray-50">
         <div className="relative">
+          {/* ... (background SVGs) ... */}
           <div className="hidden sm:block h-56 w-56 text-indigo-300 absolute a-z-10 -left-20 -top-20">
             <svg
               id="patternId"
@@ -146,25 +160,60 @@ function Register() {
                 Please sign-in to access your account
               </p>
 
+              {/* --- ROLE BUTTONS --- */}
+              <div className="mb-6">
+                {/* "I AM A:" label removed */}
+                <div className="flex justify-center">
+                  {" "}
+                  {/* Centering wrapper */}
+                  <div className="flex flex-nowrap justify-around gap-x-1 w-fit p-1 bg-slate-100 rounded-md text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setRole(Roles.WARDEN)}
+                      className={`rounded-md py-2 px-4 transition-all text-black ${
+                        role === Roles.WARDEN && " bg-indigo-500 text-white"
+                      }`}
+                    >
+                      Warden
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole(Roles.STUDENT)}
+                      className={`rounded-md py-2 px-4 transition-all text-black ${
+                        role === Roles.STUDENT && "bg-indigo-500 text-white"
+                      }`}
+                    >
+                      Student
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole(Roles.WORKER)}
+                      className={`rounded-md py-2 px-4 transition-all text-black ${
+                        role === Roles.WORKER && "bg-indigo-500 text-white"
+                      }`}
+                    >
+                      Worker
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {/* --- END ROLE BUTTONS --- */}
+
               <form className="mb-4" action="#" method="POST">
                 <div className="mb-4">
-                  <div className="flex justify-between">
-                    <label
-                      className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
-                      htmlFor="password"
-                    >
-                      Full Name
-                    </label>
-                  </div>
-                  <div className="relative flex w-full flex-wrap items-stretch">
-                    <input
-                      type="text"
-                      className="relative block flex-auto cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
-                      name="full-name"
-                      placeholder="Enter your full name"
-                      onChange={(e) => setFullname(e.target.value)}
-                    />
-                  </div>
+                  <label
+                    className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
+                    htmlFor="full-name"
+                  >
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    className="relative block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
+                    name="full-name"
+                    placeholder="Enter your full name"
+                    onChange={(e) => setFullname(e.target.value)}
+                  />
                 </div>
 
                 <div className="mb-4 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
@@ -187,7 +236,7 @@ function Register() {
                   </div>
                   <div className="flex-1">
                     <label
-                      htmlFor="password"
+                      htmlFor="phone"
                       className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
                     >
                       Phone Number
@@ -195,7 +244,7 @@ function Register() {
                     <input
                       type="text"
                       className="block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
-                      name="password"
+                      name="phone"
                       placeholder="Enter your phone number"
                       onChange={(e) => setPhone(e.target.value)}
                     />
@@ -205,7 +254,7 @@ function Register() {
                 <div className="mb-4 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
                   <div className="flex-1">
                     <label
-                      htmlFor="email"
+                      htmlFor="block_id"
                       className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
                     >
                       Block ID
@@ -215,17 +264,16 @@ function Register() {
                       className={`block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow ${
                         role === Roles.WARDEN && "w-full"
                       }`}
-                      id="email"
-                      name="email-username"
+                      id="block_id"
+                      name="block_id"
                       placeholder="Enter your Block ID"
-                      autoFocus
                       onChange={(e) => setBlock_id(e.target.value)}
                     />
                   </div>
-                  {role === Roles.WARDEN ? null : (
+                  {role === Roles.STUDENT ? (
                     <div className="flex-1">
                       <label
-                        htmlFor="password"
+                        htmlFor="room"
                         className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
                       >
                         Room
@@ -233,24 +281,22 @@ function Register() {
                       <input
                         type="text"
                         className="block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
-                        name="password"
+                        name="room"
                         placeholder="Enter your Room"
                         onChange={(e) => setRoom(e.target.value)}
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
+                {/* --- NEW 2-COLUMN LAYOUT FOR CONDITIONAL FIELDS + PASSWORD --- */}
                 <div className="mb-4 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
-                  <div
-                    className={
-                      role === Roles.STUDENT ? "flex-1 w-full" : "flex-1"
-                    }
-                  >
+                  {/* --- Column 1: Conditional Fields --- */}
+                  <div className="flex-1">
                     {role === Roles.STUDENT && (
                       <>
                         <label
-                          htmlFor="email"
+                          htmlFor="usn"
                           className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
                         >
                           Reg. No.
@@ -258,13 +304,64 @@ function Register() {
                         <input
                           type="text"
                           className="block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
-                          name="email-username"
+                          name="usn"
                           placeholder="Enter your Reg. No."
-                          autoFocus
                           onChange={(e) => setUsn(e.target.value)}
                         />
                       </>
                     )}
+
+                    {role === Roles.WORKER && (
+                      <>
+                        <label
+                          htmlFor="specialization"
+                          className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
+                        >
+                          Specialization
+                        </label>
+                        <select
+                          id="specialization"
+                          name="specialization"
+                          className="block w-full cursor-pointer appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
+                          value={specialization}
+                          onChange={(e) => setSpecialization(e.target.value)}
+                        >
+                          <option value="Electric">Electric</option>
+                          <option value="Water">Water</option>
+                          <option value="Carpentry">Carpentry</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* --- Column 2: Password (or empty if Student/Worker not selected) --- */}
+                  <div className="flex-1">
+                    {/* Only show password here if a conditional field is also present */}
+                    {role === Roles.STUDENT || role === Roles.WORKER ? (
+                      <>
+                        <label
+                          htmlFor="password"
+                          className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
+                        >
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          id="password"
+                          className="relative block w-full cursor-text appearance-none rounded-md border border-gray-400 bg--100 py-2 px-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:text-gray-600 focus:shadow"
+                          name="password"
+                          placeholder="············"
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* --- Password field for Warden (full-width) --- */}
+                {role === Roles.WARDEN && (
+                  <div className="mb-4">
                     <label
                       htmlFor="password"
                       className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
@@ -280,35 +377,8 @@ function Register() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
-                  <div className="flex-1">
-                    <label
-                      htmlFor="role"
-                      className="mb-2 inline-block text-xs font-medium uppercase text-gray-700"
-                    >
-                      Role
-                    </label>
-                    <div className="flex gap-x-3 w-fit pl-2 pr-2 bg-slate-100 rounded-md text-sm">
-                      <button
-                        type="button"
-                        onClick={() => setRole(Roles.WARDEN)}
-                        className={`rounded-md p-2 my-1 transition-all text-black ${
-                          role === Roles.WARDEN && " bg-indigo-500 text-white"
-                        }`}
-                      >
-                        Warden
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRole(Roles.STUDENT)}
-                        className={`rounded-md p-2 my-1 transition-all text-black ${
-                          role === Roles.STUDENT && "bg-indigo-500 text-white"
-                        }`}
-                      >
-                        Student
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
+                {/* --- END LAYOUT CHANGES --- */}
 
                 <div className="mb-4">
                   <button

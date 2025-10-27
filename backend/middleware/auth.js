@@ -38,3 +38,14 @@ exports.authorizeWarden = (req, res, next) => {
     res.status(403).json({ msg: 'Access denied. Wardens only.' });
   }
 };
+
+// --- NEW MIDDLEWARE ---
+// This middleware checks if the user is a worker
+exports.authorizeWorker = (req, res, next) => {
+  if (req.user && req.user.type === 'worker') {
+    next();
+  } else {
+    res.status(403).json({ msg: 'Access denied. Workers only.' });
+  }
+};
+// --- END NEW MIDDLEWARE ---

@@ -23,17 +23,36 @@ const ComplaintSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  is_completed: {
-    type: Boolean,
-    default: false,
+  category: {
+    type: String,
+    enum: ['Electric', 'Water', 'Carpentry', 'Other'],
+    required: true,
+  },
+  assigned_to: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // This will link to the Worker
+    default: null,
+  },
+  // --- NEW STATUS LOGIC ---
+  status: {
+    type: String,
+    enum: ['Pending', 'Assigned', 'Work_Completed', 'Verified'],
+    default: 'Pending',
   },
   created_at: {
     type: Date,
     default: Date.now,
   },
-  assigned_at: {
+  assigned_at: { // When the worker was assigned
     type: Date,
   },
+  worker_completed_at: { // When the worker ticked 'complete'
+    type: Date,
+  },
+  verified_at: { // When the warden verified the completion
+    type: Date,
+  },
+  // --- `is_completed` and `completed_at` are removed ---
 });
 
 module.exports = mongoose.model('Complaint', ComplaintSchema);

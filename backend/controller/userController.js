@@ -3,7 +3,8 @@ const Block = require('../models/Block');
 const { jwtGenerator } = require("../utils/jwtToken");
 
 exports.userRegister = async (req, res) => {
-  const { full_name, email, phone, password, type, block_id, usn, room } = req.body;
+  // Added specialization
+  const { full_name, email, phone, password, type, block_id, usn, room, specialization } = req.body;
 
   try {
     // 1. Check if user already exists
@@ -29,6 +30,7 @@ exports.userRegister = async (req, res) => {
       block_id: userBlock._id, // Store the Mongo _id
       usn: type === 'student' ? usn : undefined,
       room: type === 'student' ? room : undefined,
+      specialization: type === 'worker' ? specialization : undefined, // Added this
     });
 
     // 4. Save user to DB
@@ -69,3 +71,21 @@ exports.userLogin = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+// --- NEW FUNCTION ---
+// Get all workers for a warden's block
+exports.getAllWorkers = async (req, res) => {
+  try {
+    // req.user is from 'auth' middleware, block_id is populated
+    const workers = await User.find({
+      type: 'worker',
+      block_id: req.user.block_id._id 
+    }).select('full_name specialization'); // Only send necessary info
+
+    res.json(workers);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+// --- END NEW FUNCTION ---
